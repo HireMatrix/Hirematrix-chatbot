@@ -1,0 +1,9 @@
+FROM "./unsloth.Q4_K_M.gguf"
+TEMPLATE """<|im_start|>system
+{{ if .System }}{{ .System }}{{ end }}<|im_end|>
+<|im_start|>user
+{{ .Prompt }}<|im_end|>
+<|im_start|>assistant"""
+PARAMETER stop "<|im_end|>", "<|im_start|>"
+PARAMETER temperature 1.5
+PARAMETER min_p 0.1
