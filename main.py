@@ -1,76 +1,6 @@
-# from fastapi import FastAPI
-# from transformers import AutoModelForCausalLM, AutoTokenizer
-# from pydantic import BaseModel
-# import torch
-
-# app = FastAPI()
-
-# # Load the model and tokenizer
-# model_path = "C:/Users/gowth/coding/college-final-year-project/Hirematrix-chatbot/mistral_finetuned_model"
-# tokenizer = AutoTokenizer.from_pretrained(model_path)
-# model = AutoModelForCausalLM.from_pretrained(model_path, torch_dtype=torch.float32)
-
-# class InputData(BaseModel):
-#     text: str
-
-# @app.post("/generate")
-# async def generate_text(data: InputData):
-#     inputs = tokenizer(data.text, return_tensors="pt")
-#     output = model.generate(**inputs, max_length=150)
-#     response = tokenizer.decode(output[0], skip_special_tokens=True)
-#     return {"response": response}
-
-# if __name__ == "__main__":
-#     import uvicorn
-#     uvicorn.run(app, host="127.0.0.1", port=8000)
-
-
-# from fastapi import FastAPI
-# from pydantic import BaseModel
-# from transformers import AutoModelForCausalLM, AutoTokenizer
-# import torch
-
-# # Define request model
-# class RequestModel(BaseModel):
-#     prompt: str
-#     max_tokens: int = 128  # Default value
-
-# app = FastAPI()
-
-# MODEL_PATH = "C:/Users/gowth/coding/college-final-year-project/Hirematrix-chatbot/mistral_finetuned_model"
-
-# # Load tokenizer and model on CPU
-# tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-# model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, device_map="cpu", torch_dtype=torch.float32)
-
-# @app.get("/")
-# def home():
-#     return {"message": "Mistral 7B API is running!"}
-
-# @app.post("/generate/")
-# def generate(request: RequestModel):  # Accept JSON body
-#     inputs = tokenizer(request.prompt, return_tensors="pt")
-
-#     with torch.no_grad():  # Disable gradients for inference
-#         output = model.generate(**inputs, max_new_tokens=request.max_tokens)
-
-#     response = tokenizer.decode(output[0], skip_special_tokens=True)
-#     return {"response": response}
-
-# from fastapi import FastAPI
-# import ollama
-
-# app = FastAPI()
-
-# @app.post("/generate")
-# def generate(prompt: str):
-#     response = ollama.chat(model="hirematrix-mistral", messages=[{"role": "user", "content": prompt}])
-#     return {"response": response["message"]["content"]}
-
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 import ollama
 import asyncio
@@ -98,6 +28,62 @@ async def generate_stream(prompt: str):
     for chunk in response:
         yield chunk["message"]["content"]
         await asyncio.sleep(0)
+
+@app.post("/parse-job")
+async def parse_job(prompt: PromptRequest):
+    final_prompt = f"""
+You are a strict JSON generator. Extract job data and return exactly one object inside a JSON array. DO NOT include explanations, markdown, or extra text. should follow this order and in the json format as below.
+
+### OUTPUT FORMAT (ONLY this allowed):
+[
+{{
+    "title": string,
+    "experience": number,               // years only (e.g., 2) extract this from the jobtags must be number
+    "salary": number,                   // only numeric salary (e.g., 120000) must be number
+    "highestEducation": string,        // e.g., "Graduate", "Post Graduate", etc.
+    "workMode": [string],              // Only: "Work from office", "Work from home", "Hybrid"
+    "workType": [string],              // Only: "Full time", "Part time"
+    "workShift": [string],             // Only: "Day shift", "Night shift"
+    "department": [string],            // Always an array, can have multiple like ["IT", "Security"]
+    "englishLevel": string,            // Only: "Good English", "Intermediate English", "Advanced English"
+    "gender": string,                  // Only: "Any", "Male", "Female" these values
+    "location": string,                // City, State
+    "description": string              // Exact copy from the description
+}}
+]
+
+### RULES:
+- Return ONLY a single array with one object. No markdown, no backticks, no extra text.
+- If a field is missing:
+  - string → ""
+  - number → 0
+  - array → []
+- Experience: extract numbers from phrases like “3+ years” → 3
+- Salary: extract numeric part from strings like “₹12,00,000” → 1200000
+- `gender` must be one of: "Male", "Female", "Any" (if not mentioned, default to "Any")
+- `englishLevel` must be normalized to:
+  - "Good English"
+  - "Intermediate English"
+  - "Advanced English"
+  (if unclear, default to "Good English")
+- Normalize work-related fields:
+  - Work Mode: "Office", "Work from Office" → "Work from office"; "Remote", "Work from Home" → "Work from home"
+  - Work Type: "Full Time" → "Full time"
+  - Work Shift: "Day Shift" → "Day shift"
+- `department`, `workType`, `workMode`, `workShift` must ALWAYS be arrays, even if only one item.
+- `description` must be copied exactly from the source description with no changes or paraphrasing.
+
+### INPUT:
+{prompt.prompt}
+"""
+    response = ollama.chat(
+        model="nuextract",
+        messages=[
+            { "role": "user", "content": final_prompt }
+        ]
+    )
+    
+    return JSONResponse(content=response["message"]["content"])
 
 @app.post("/generate")
 async def generate(request: PromptRequest):
