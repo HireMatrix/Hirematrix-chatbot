@@ -29,62 +29,69 @@ async def generate_stream(prompt: str):
         yield chunk["message"]["content"]
         await asyncio.sleep(0)
 
+@app.post("/generate")
+async def generate(request: PromptRequest):
+    return StreamingResponse(generate_stream(request.prompt), media_type="text/plain")
+
 @app.post("/parse-job")
 async def parse_job(prompt: PromptRequest):
-    final_prompt = f"""
-You are a strict JSON generator. Extract job data and return exactly one object inside a JSON array. DO NOT include explanations, markdown, or extra text. should follow this order and in the json format as below.
+    final_prompt = f'''
+You are a strict JSON generator and not a conversational AI. Extract job data from the input and return exactly one valid JSON array with **one object** only.
 
-### OUTPUT FORMAT (ONLY this allowed):
+‼️ IMPORTANT RULES:
+- No explanation, markdown, or extra text.
+- Escape all special characters properly.
+- No trailing commas.
+- Use **double quotes** for all keys and values.
+- Arrays: `workMode`, `workType`, `workShift`, `department`
+- Use empty string `""` for missing strings, `0` for missing numbers, `[]` for missing arrays.
+
+EXPECTED OUTPUT FORMAT:
 [
 {{
-    "title": string,
-    "experience": number,               // years only (e.g., 2) extract this from the jobtags must be number
-    "salary": number,                   // only numeric salary (e.g., 120000) must be number
-    "highestEducation": string,        // e.g., "Graduate", "Post Graduate", etc.
-    "workMode": [string],              // Only: "Work from office", "Work from home", "Hybrid"
-    "workType": [string],              // Only: "Full time", "Part time"
-    "workShift": [string],             // Only: "Day shift", "Night shift"
-    "department": [string],            // Always an array, can have multiple like ["IT", "Security"]
-    "englishLevel": string,            // Only: "Good English", "Intermediate English", "Advanced English"
-    "gender": string,                  // Only: "Any", "Male", "Female" these values
-    "location": string,                // City, State
-    "description": string              // Exact copy from the description
+    "title": "",                    
+    "company": "",                  
+    "experience": 0,               
+    "salary": 0,                   
+    "highestEducation": "",        
+    "workMode": [],                
+    "workType": [],                
+    "workShift": [],               
+    "department": [],              
+    "englishLevel": "",            
+    "gender": "",                  
+    "location": "",                
+    "description": ""              
 }}
 ]
 
-### RULES:
-- Return ONLY a single array with one object. No markdown, no backticks, no extra text.
-- If a field is missing:
-  - string → ""
-  - number → 0
-  - array → []
-- Experience: extract numbers from phrases like “3+ years” → 3
-- Salary: extract numeric part from strings like “₹12,00,000” → 1200000
-- `gender` must be one of: "Male", "Female", "Any" (if not mentioned, default to "Any")
-- `englishLevel` must be normalized to:
-  - "Good English"
-  - "Intermediate English"
-  - "Advanced English"
-  (if unclear, default to "Good English")
-- Normalize work-related fields:
-  - Work Mode: "Office", "Work from Office" → "Work from office"; "Remote", "Work from Home" → "Work from home"
-  - Work Type: "Full Time" → "Full time"
-  - Work Shift: "Day Shift" → "Day shift"
-- `department`, `workType`, `workMode`, `workShift` must ALWAYS be arrays, even if only one item.
-- `description` must be copied exactly from the source description with no changes or paraphrasing.
+EXTRACTION RULES:
+- experience: Extract years from phrases like “3+ years” → 3
+- salary: Extract numbers only, e.g. “₹12,00,000” → 1200000
+- gender: "Male", "Female", or "Any" (default = "Any")
+- englishLevel: "Good English", "Intermediate English", "Advanced English" (default = "Good English")
+- Normalize workMode: ["Work from office", "Work from home", "Hybrid"]
+- Normalize workType: ["Full time", "Part time", "Internship"]
+- Normalize workShift: ["Day shift", "Night shift", "Rotational"]
+- description: Use as-is, without paraphrasing
 
-### INPUT:
+INPUT DATA:
 {prompt.prompt}
-"""
+'''
+
     response = ollama.chat(
-        model="nuextract",
+        model="phi3",
         messages=[
             { "role": "user", "content": final_prompt }
         ]
     )
-    
+
     return JSONResponse(content=response["message"]["content"])
 
-@app.post("/generate")
-async def generate(request: PromptRequest):
-    return StreamingResponse(generate_stream(request.prompt), media_type="text/plain")
+@app.post("/embedding")
+async def generate_embedding(data: PromptRequest):
+    response = ollama.embeddings(
+        model='nomic-embed-text',
+        prompt=data.prompt
+    )
+    return JSONResponse(content={"embedding": response["embedding"]})
