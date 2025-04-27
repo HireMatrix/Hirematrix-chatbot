@@ -103,7 +103,7 @@ async def resume_analyzer(prompt: PromptRequest):
     final_prompt = f"""
 You are a professional resume analyzer.
 
-Analyze the following resume text carefully.
+Analyze the following resume text carefully. Pay close attention to minor grammar issues like missing articles, wrong tense, or awkward phrasing even if they seem small.
 
 You must strictly return a valid JSON object with the exact following keys and structure (no missing keys, no additional keys):
 
@@ -147,10 +147,7 @@ Resume Text:
         model="llama3.1",
         messages=[
             {"role": "user", "content": final_prompt}
-        ],
-        options={
-            "temperature": 0
-        }
+        ]
     )
     raw_content = response["message"]["content"]
 

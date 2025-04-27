@@ -9,4 +9,4 @@ python-socketio[asgi]
 aiofiles
 vosk
 aiohttp
-pdfminer.six
+PyMuPDF

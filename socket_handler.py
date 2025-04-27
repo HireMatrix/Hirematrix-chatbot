@@ -6,19 +6,35 @@ import base64
 import io
 import aiohttp
 import re
+import fitz
+from aiohttp import web
 
 model = Model("models/vosk-model-en-us-0.42-gigaspeech")
 
-sio = socketio.AsyncServer(cors_allowed_origins=["http://localhost:5173"])
-from aiohttp import web
+sio = socketio.AsyncServer(
+    cors_allowed_origins=["http://localhost:5173"],
+    async_mode='aiohttp',
+    max_http_buffer_size=100*1024*1024
+)
+
 app = web.Application()
 
 recognizers = {}
 
+def extract_text_from_pdf(file_stream):
+    doc = fitz.open(stream=file_stream, filetype="pdf")
+    text = ""
+    for page in doc:
+        text += page.get_text()
+    return text
+
 def clean_extracted_text(text):
-    text = text.encode("utf-8", "ignore").decode()
-    text = re.sub(r'\n+', '\n', text)
+    text = text.encode('ascii', 'ignore').decode()
+    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
+    text = text.replace('ﬀ', 'ff').replace('ﬁ', 'fi').replace('ﬂ', 'fl')
     text = text.replace('"', "'")
+    text = re.sub(r'\n+', '\n', text)
+    text = re.sub(r' +', ' ', text)
     return text.strip()
 
 def register_socket_events(sio):
@@ -60,7 +76,7 @@ def register_socket_events(sio):
             await sio.emit("resumeStatus", { "message": "Extracting Text..." }, to=sid)
             file_data = base64.b64decode(resumeData)
             file_stream = io.BytesIO(file_data)
-            extracted_text = extract_text(file_stream)
+            extracted_text = extract_text_from_pdf(file_stream)
 
             await sio.emit("resumeStatus", { "message": "Cleaning the Extracted Text..." }, to=sid)
 
