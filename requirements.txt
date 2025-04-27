@@ -1,7 +1,12 @@
-fastapi 
+fastapi
 uvicorn
 ollama
 python-dotenv
 requests
-asyncio
 pydantic
+fastapi-socketio
+python-socketio[asgi]
+aiofiles
+vosk
+aiohttp
+pdfminer.six

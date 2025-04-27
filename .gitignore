@@ -1,0 +1,32 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.ENV/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# IDEs and editors
+.vscode/
+.idea/
+
+# Logs and database
+*.log
+*.sqlite3
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# dotenv
+.env
+
+vosk-model-en-in-0.5
+vosk-model-en-us-0.42-gigaspeech
