@@ -1,7 +1,6 @@
 import socketio
 from vosk import Model, KaldiRecognizer
 import json
-from pdfminer.high_level import extract_text
 import base64
 import io
 import aiohttp
